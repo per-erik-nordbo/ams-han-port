@@ -1,0 +1,44 @@
+#include <stdio.h>
+#include "fcs.h"
+
+int main()
+{
+  unsigned char buf1[] = {0xa0, 0x65,
+			  0x01, 0x02,
+			  0x01,
+			  0x10,
+			  0xf0, 0x50};
+  
+  unsigned char buf2[] = {0xa0, 0x27,
+			  0x01, 0x02,
+			  0x01,
+			  0x10,
+			  0x5a, 0x87,
+			  0xe6, 0xe7, 0x00,
+			  0x0f, 0x40, 0x00, 0x00, 0x00, 0x09, 0x0c, 0x07, 0xd0,
+			  0x01, 0x03, 0x01, 0x01, 0x2d, 0x15, 0xff, 0x80, 0x00,
+			  0x03, 0x02, 0x01, 0x06, 0x00, 0x00, 0x00, 0x00,
+			  0x81, 0xb0};
+
+  /* set default little endian */
+  int fb = 0;
+  int lb = 1;
+  
+  if (is_big_endian()) { /* oops, big endian */
+    fb = 1;
+    fb = 0;
+  }
+
+  union {
+    unsigned char be[2];
+    u16 fcs;
+  } sw;
+
+  sw.fcs = pppfcs16(PPPINITFCS16, buf1, 6) ^0xffff; printf("%02x %02x\n", sw.be[fb], sw.be[lb]);
+  sw.fcs = pppfcs16(PPPINITFCS16, buf2, 6) ^0xffff; printf("%02x %02x\n",  sw.be[fb], sw.be[lb]);
+  sw.fcs = pppfcs16(PPPINITFCS16, buf2, 37) ^0xffff; printf("%02x %02x\n", sw.be[fb], sw.be[lb]);
+
+  return 0;
+}
+
+/* end of file */

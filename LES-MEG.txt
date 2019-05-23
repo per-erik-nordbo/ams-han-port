@@ -1,0 +1,73 @@
+############################
+# Bruk av HAN SW - eksempler
+############################
+
+1. Kildekoden:
+---------------
+
+cd src/han-port
+
+1.1 Kompiler:
+-------------
+
+make
+
+2. Hjelp / Hvordan bruke 'test_rx':
+-----------------------------------------
+
+Etter at du har koblet til USB-kabel kommer det dynamisk en ny USB device som typisk heter /dev/ttyUSB0 (hvis dette er den første tty-USB enheten).
+
+2.1 Utfør kommandoen:
+
+«ls -l /dev/tty* | grep -i usb»
+
+før og etter at du har installert USB donglelen.
+
+2.2 Gjør enheten tilgjengelig for vanlige brukere:
+
+chmod 666 /dev/ttyUSB0
+
+Dette må (pga sikkerheten i Raspbian) gjøres hver gang USB dongelen plugges i!
+
+En "quick & dirty" løsning kan være å legge inn 'chmod 666 /dev/ttyUSB0' i en cron jobb som kjøres hvert 5 sekund. 
+
+2.2 Bruk av test_rx programmet:
+
+./test_rx -h
+
+2.3 Replay fra fil:
+------------------
+
+./test_rc -f han-data-MA105H2E-2017-01-26_08:00-11:00.dat
+
+2.4 Replay fra fil logget fra kryptert HAN-port fil:
+----------------------------------------------------------
+
+./test_rx -f han-data-MA105H2E-C00112233445566778899AABBCCDDEEFF-2017-01-25_08:00-12:00.dat -k 00112233445566778899AABBCCDDEEFF
+
+2.5 Logging til fil USB/RS232 adapteret mitt som dukker opp som /dev/ttyUSB0 (se hva som er lagt inn default i Makefile):
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+./test_rx -d /dev/ttyUSB0
+
+2.6 Bare logging til skjerm:
+------------------------------
+
+./test_rx -n -d /dev/ttyUSB0
+
+2.7 Multicast meldingene videre på LAN-et:
+-----------------------------------------------------
+
+./test_rx -m -n -d /dev/ttyUSB0
+
+2.8 Multicast meldingene som leses fra fil, lager 1s pause etter hver multicast sending 
+---------------------------------------------------------------------------------------
+
+./test_rx -M -f han-data-MA304T3-2017-01-23_13:03-15:57.dat
+
+2.9 Mottak av multicast fra en annen pi/pc/whatever
+-----------------------------------------------------
+
+./test_rx -l
+
+#######################################################################################

@@ -1,0 +1,690 @@
+
+/******************************************************************************
+ * main: read from han-port or file
+ * 
+ * compile: gcc demo_rx.c rs232.c crc.c -Wall -Wextra -o2 -o test_rx
+ * 
+ *****************************************************************************/
+
+#include <stdio.h>
+#include <time.h>
+#include <stdlib.h>
+
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include <unistd.h>
+#endif
+
+#include "rs232.h"
+
+typedef struct {
+  int act_pow_pos; /* OBIS Code 1.0.1.7.0.255 - Active Power + (Q1+Q4) */
+} Items1;
+
+typedef struct {
+  char obis_list_version[1000]; /* OBIS Code 1.1.0.2.129.255 - OBIS List Version Identifier */
+  char gs1[1000]; /* OBIS Code 0.0.96.1.0.255 - Meter-ID(GIAI GS1 - 16 digits */
+  char meter_model[1000]; /* OBIS Code 0.0.96.1.7 - Meter Type */
+  int act_pow_pos; /* Active Power + */
+  int act_pow_neg; /* Actve Power - */
+  int react_pow_pos; /* Reactive Power + */
+  int react_pow_neg; /* Reactive Power - */
+  int curr_L1; /* Current Phase L1 */
+  int volt_L1; /* Voltage L1 */
+} Items9;
+
+typedef struct {
+  char obis_list_version[1000]; /* OBIS Code 1.1.0.2.129.255 - OBIS List Version Identifier */
+  char gs1[1000]; /* OBIS Code 0.0.96.1.0.255 - Meter-ID(GIAI GS1 - 16 digits */
+  char meter_model[1000]; /* OBIS Code 0.0.96.1.7.255 - Meter Type */
+  int act_pow_pos;  /* Active Power + */
+  int act_pow_neg;  /* Active Power - */
+  int react_pow_pos;  /* Reactive Power + */
+  int react_pow_neg;  /* Reactive Power - */
+  int curr_L1;  /* Current Phase L1 mA */
+  int curr_L2;  /* Current Phase L2 mA */
+  int curr_L3; /* Current Phase L3 mA */
+  int volt_L1; /* Voltage L1 */
+  int volt_L2; /* Voltage L2 */
+  int volt_L3; /* Voltage L3 */
+} Items13;
+
+typedef struct {
+  char obis_list_version[1000]; /* OBIS Code 1.1.0.2.129.255 - OBIS List Version Identifier */
+  char gs1[1000]; /* OBIS Code 0.0.96.1.0.255 - Meter-ID(GIAI GS1 - 16 digits */
+  char meter_model[1000]; /* OBIS Code 0.0.96.1.7.255 - Meter Type */
+  int act_pow_pos; /* Active Power + */
+  int act_pow_neg; /* Active Power - */
+  int react_pow_pos; /* Reactive Power + */
+  int react_pow_neg; /* Reactive Power - */
+  int curr_L1;
+  int volt_L1;
+  char date_time[1000]; /* OBIS Code: 0.0.1.0.0.255 - Clock and Date in Meter */
+  int act_energy_pos;
+  int act_energy_neg;
+  int react_energy_pos;
+  int react_energy_neg;  
+} Items14;
+
+typedef struct {
+  char obis_list_version[1000]; /* OBIS Code 1.1.0.2.129.255 - OBIS List Version Identifier */
+  char gs1[1000]; /* OBIS Code 0.0.96.1.0.255 - Meter-ID(GIAI GS1 - 16 digits */
+  char meter_model[1000]; /* OBIS Code 0.0.96.1.7.255 - Meter Type */
+  int act_pow_pos; /* Active Power + */
+  int act_pow_neg; /* Active Power - */
+  int react_pow_pos; /* Reactive Power + */
+  int react_pow_neg; /* Reactive Power - */
+  int curr_L1; /* Current L1 */
+  int curr_L2; /* Current L2 */
+  int curr_L3; /* Current L3 */
+  int volt_L1; /* Voltage L1 */
+  int volt_L2; /* Voltage L2 */
+  int volt_L3; /* Voltage L3 */
+  char date_time[1000]; /* OBIS Code: 0.0.1.0.0.255 - Clock and Date in Meter */
+  int act_energy_pa; /* Active Energy +A */
+  int act_energy_ma; /* Active Energy -A */
+  int act_energy_pr; /* Active Energy +R */
+  int act_energy_mr; /* Active Energy -R */
+} Items18;
+
+/*
+7e
+a0 87
+01 02
+01
+10
+9e 6d e6 e7 00 0f 40 00 00 00
+09 0c 07 d0 01 03 01 0e 00 0c ff 80 00 03
+02 0e
+09 07 4b 46 4d 5f 30 30 31
+09 10 36 39 37 30 36 33 31 34 30 30 30 30 30 39 35 30
+09 08 4d 41 31 30 35 48 32 45
+06 00 00 00 00
+06 00 00 00 00
+06 00 00 00 00
+06 00 00 00 00
+06 00 00 00 0e
+06 00 00 09 01
+09 0c 07 d0 01 03 01 0e 00 0c ff 80 00 03
+06 00 00 00 00
+06 00 00 00 00
+06 00 00 00 00
+06 00 00 00 00
+97 35
+7e
+*/
+
+typedef struct {
+  int year;
+  int month;
+  int day;
+  int hour;
+  int min;
+  int sec;
+  char tm[100];
+  int num_items;
+  union {
+    Items1 msg1;   /* List 1: 1-and-3-phase */
+    Items9 msg9;   /* List 2: 1-phase */
+    Items13 msg13; /* List 2: 3-phase */
+    Items14 msg14; /* List 3: 1-phase */ 
+    Items18 msg18; /* List 3: 3-phase */
+  };
+} HanMsg;
+
+HanMsg msg;
+
+/**********************************************************
+ * FUNCTION: verifyMessage()
+ *********************************************************/
+int verifyMessage(unsigned char *buf,
+		  unsigned int buf_len)
+{
+  /* warning killers */
+  buf = buf;
+  buf_len = buf_len;
+  
+  return 0;
+}
+
+/**********************************************************
+ * FUNCTION: decodeMessage()
+ *********************************************************/
+int decodeMessage(unsigned char *buf,
+		  int buf_len,
+		  HanMsg *msg)
+{
+  /* warning killers */
+  buf_len = buf_len;
+  
+  memset(msg, 0, sizeof(HanMsg)); /* clear/init data */
+  
+  if (buf[17] == 0x09) {
+
+    msg->year = buf[19]<<8 | buf[20];
+    msg->month = buf[21];
+    msg->day = buf[22];
+    msg->hour = buf[24];
+    msg->min = buf[25];
+    msg->sec = buf[26];
+    
+    sprintf(msg->tm, "%d-%02d-%02d %02d:%02d:%02d", msg->year, msg->month, msg->day, msg->hour, msg->min, msg->sec);
+
+    int offset = 17 + 2 + buf[18];
+    if (buf[offset]== 0x02) {
+      msg->num_items = buf[offset+1];
+    }
+    offset+=2;
+    if (msg->num_items == 1) { /* Num Records: 1 */
+      if (buf[offset]==0x06) { /* Item 1 */
+	msg->msg1.act_pow_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+    }
+    else if (msg->num_items==9) { /* Num records: 9 */
+      unsigned int num_bytes;
+      if (buf[offset]==0x09) { /* Item 1 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg9.obis_list_version, (const char *) buf+offset+2, num_bytes);
+	msg->msg9.obis_list_version[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x09) { /* Item 2 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg9.gs1, (const char *) buf+offset+2, num_bytes);
+	msg->msg9.gs1[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x09) { /* Item 3 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg9.meter_model, (const char *) buf+offset+2, num_bytes);
+	msg->msg9.meter_model[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x06) { /* Item 4 */
+	msg->msg9.act_pow_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 5 */
+	msg->msg9.act_pow_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 6 */
+	msg->msg9.react_pow_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 7 */
+	msg->msg9.react_pow_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 8 */
+	msg->msg9.curr_L1 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 9 */
+	msg->msg9.volt_L1 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+    }
+    else if (msg->num_items==13) { /* Num records: 13 */
+      unsigned int num_bytes;
+      if (buf[offset]==0x09) { /* Item 1 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg13.obis_list_version, (const char *) buf+offset+2, num_bytes);
+	msg->msg13.obis_list_version[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x09) { /* Item 2 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg13.gs1, (const char *) buf+offset+2, num_bytes);
+	msg->msg13.gs1[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x09) { /* Item 3 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg13.meter_model, (const char *) buf+offset+2, num_bytes);
+	msg->msg13.meter_model[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x06) { /* Item 4 */
+	msg->msg13.act_pow_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 5 */
+	msg->msg13.act_pow_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 6 */
+	msg->msg13.react_pow_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 7 */
+	msg->msg13.react_pow_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 8 */
+	msg->msg13.curr_L1 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 9 */
+	msg->msg13.curr_L2 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 10 */
+	msg->msg13.curr_L3 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 11 */
+	msg->msg13.volt_L1 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 12 */
+	msg->msg13.volt_L2 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 13 */
+	msg->msg13.volt_L3 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+    }
+    else if (msg->num_items==14) { /* Num records: 14 */
+      unsigned int num_bytes;
+      if (buf[offset]==0x09) { /* Item 1 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg14.obis_list_version, (const char *) buf+offset+2, num_bytes);
+	msg->msg14.obis_list_version[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x09) { /* Item 2 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg14.gs1, (const char *) buf+offset+2, num_bytes);
+	msg->msg14.gs1[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x09) { /* Item 3 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg14.meter_model, (const char *) buf+offset+2, num_bytes);
+	msg->msg14.meter_model[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x06) { /* Item 4 */
+	msg->msg14.act_pow_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 5 */
+	msg->msg14.act_pow_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 6 */
+	msg->msg14.react_pow_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 7 */
+	msg->msg14.react_pow_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 8 */
+	msg->msg14.curr_L1 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 9 */
+	msg->msg14.volt_L1 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x09) { /* Item 10 */
+	num_bytes = buf[offset+1];
+
+	int year = buf[offset+2]<<8 | buf[offset+3];
+	int month = buf[offset+4];
+	int day = buf[offset+5];
+	int hour = buf[offset+7];
+	int min = buf[offset+8];
+	int sec = buf[offset+9];
+    
+	sprintf(msg->msg14.date_time, "%d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, min, sec);
+
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x06) { /* Item 11 */
+	msg->msg14.act_energy_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 12 */
+	msg->msg14.act_energy_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 13 */
+	msg->msg14.react_energy_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 14 */
+	msg->msg14.react_energy_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+    }
+    else if (msg->num_items==18) { /* Num records: 18 */
+      unsigned int num_bytes;
+      if (buf[offset]==0x09) { /* Item 1 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg18.obis_list_version, (const char *) buf+offset+2, num_bytes);
+	msg->msg18.obis_list_version[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x09) { /* Item 2 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg18.gs1, (const char *) buf+offset+2, num_bytes);
+	msg->msg18.gs1[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x09) { /* Item 3 */
+	num_bytes = buf[offset+1];
+	strncpy(msg->msg18.meter_model, (const char *) buf+offset+2, num_bytes);
+	msg->msg18.meter_model[num_bytes] = '\0';
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x06) { /* Item 4 */
+	msg->msg18.act_pow_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 5 */
+	msg->msg18.act_pow_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 6 */
+	msg->msg18.react_pow_pos = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 7 */
+	msg->msg18.react_pow_neg = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 8 */
+	msg->msg18.curr_L1 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 9 */
+	msg->msg18.curr_L2 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 10 */
+	msg->msg18.curr_L3 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 11 */
+	msg->msg18.volt_L1 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 12 */
+	msg->msg18.volt_L2 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 13 */
+	msg->msg18.volt_L3 = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x09) { /* Item 14 */
+	num_bytes = buf[offset+1];
+
+	int year = buf[offset+2]<<8 | buf[offset+3];
+	int month = buf[offset+4];
+	int day = buf[offset+5];
+	int hour = buf[offset+7];
+	int min = buf[offset+8];
+	int sec = buf[offset+9];
+    
+	sprintf(msg->msg18.date_time, "%d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, min, sec);
+
+      }
+      offset+=2+num_bytes;
+      if (buf[offset]==0x06) { /* Item 15 */
+	msg->msg18.act_energy_pa = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 16 */
+	msg->msg18.act_energy_ma = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 17 */
+	msg->msg18.act_energy_pr = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+      offset+=1+4;
+      if (buf[offset]==0x06) { /* Item 18 */
+	msg->msg18.act_energy_mr = buf[offset+1]<<24 | buf[offset+2]<<16 | buf[offset+3]<<8 | buf[offset+4];
+      }      
+    }
+    else {
+      return 1; /* Error - Unknown msg size */
+    }
+    return 0; /* Message OK */
+  }
+  
+  return 1; /* Error - Unknown msg type */
+}
+
+/**********************************************************
+ * FUNCTION: printMessage()
+ *********************************************************/
+int printMessage(unsigned char *buf,
+		 int buf_len,
+		 HanMsg *msg,
+		 FILE *rec_file)
+{
+  for(int i=0; i<buf_len; i++) {
+    if (i>0) {
+      printf(" ");
+    }
+    printf("%02x", buf[i]);
+    if (rec_file) fputc(buf[i], rec_file);
+  }
+  printf("\n");
+  if (rec_file) fflush(rec_file);
+
+  printf("\tDate Time: %s, Items: %1d\n", msg->tm, msg->num_items);
+
+  switch (msg->num_items) {
+  case 1:
+    printf("\t\tAct Pow + (Q1+Q4): %1d\n", msg->msg1.act_pow_pos);
+    break;
+  case 9:
+    printf("\t\tOBIS List Version: %s\n", msg->msg9.obis_list_version);
+    printf("\t\tGS1: %s\n", msg->msg9.gs1);
+    printf("\t\tMeter Model: %s\n", msg->msg9.meter_model);
+    printf("\t\tAct Pow + (Q1+Q4): %1d\n", msg->msg9.act_pow_pos);
+    printf("\t\tAct Pow - (Q2+Q3): %1d\n", msg->msg9.act_pow_neg);
+    printf("\t\tReact Pow +: %1d\n", msg->msg9.react_pow_pos);
+    printf("\t\tReact Pow -: %1d\n", msg->msg9.react_pow_neg);
+    printf("\t\tCurr L1: %1d\n", msg->msg9.curr_L1);
+    printf("\t\tVolt L1: %1d\n", msg->msg9.volt_L1);
+    break;
+  case 13:
+    printf("\t\tOBIS List Version: %s\n", msg->msg13.obis_list_version);
+    printf("\t\tGS1: %s\n", msg->msg13.gs1);
+    printf("\t\tMeter Model: %s\n", msg->msg13.meter_model);
+    printf("\t\tAct Pow + (Q1+Q4): %1d\n", msg->msg13.act_pow_pos);
+    printf("\t\tAct Pow - (Q2+Q3): %1d\n", msg->msg13.act_pow_neg);
+    printf("\t\tReact Pow + (Q1+Q2): %1d\n", msg->msg13.react_pow_pos);
+    printf("\t\tReact Pow - (Q3+Q4): %1d\n", msg->msg13.react_pow_neg);
+    printf("\t\tCurr L1: %1d\n", msg->msg13.curr_L1);
+    printf("\t\tCurr L2: %1d\n", msg->msg13.curr_L2);
+    printf("\t\tCurr L3: %1d\n", msg->msg13.curr_L3);
+    printf("\t\tVolt L1: %1d\n", msg->msg13.volt_L1);
+    printf("\t\tVolt L2: %1d\n", msg->msg13.volt_L2);
+    printf("\t\tVolt L3: %1d\n", msg->msg13.volt_L3);
+    break;
+  case 14:
+    printf("\t\tOBIS List Version: %s\n", msg->msg14.obis_list_version);
+    printf("\t\tGS1: %s\n", msg->msg14.gs1);
+    printf("\t\tMeter Model: %s\n", msg->msg14.meter_model);
+    printf("\t\tAct Pow + (Q1+Q4): %1d\n", msg->msg14.act_pow_pos);
+    printf("\t\tAct Pow - (Q2+Q3): %1d\n", msg->msg14.act_pow_neg);
+    printf("\t\tReact Pow + (Q1+Q2): %1d\n", msg->msg14.react_pow_pos);
+    printf("\t\tReact Pow - (Q3+Q4): %1d\n", msg->msg14.react_pow_neg);
+    printf("\t\tCurr L1: %1d\n", msg->msg14.curr_L1);
+    printf("\t\tVolt L1: %1d\n", msg->msg14.volt_L1);
+    printf("\t\tDate Time: %s\n", msg->msg14.date_time);
+    printf("\t\tAct Energy +: %1d\n", msg->msg14.act_energy_pos);
+    printf("\t\tAct Energy -: %1d\n", msg->msg14.act_energy_neg);
+    printf("\t\tReact Energy +: %1d\n", msg->msg14.react_energy_pos);
+    printf("\t\tReact Energy -: %1d\n", msg->msg14.react_energy_neg);
+    break;
+  case 18:
+    printf("\t\tOBIS List Version: %s\n", msg->msg18.obis_list_version);
+    printf("\t\tGS1: %s\n", msg->msg18.gs1);
+    printf("\t\tMeter Model: %s\n", msg->msg18.meter_model);
+    printf("\t\tAct Pow + (Q1+Q4): %1d\n", msg->msg18.act_pow_pos);
+    printf("\t\tAct Pow - (Q2+Q3): %1d\n", msg->msg18.act_pow_neg);
+    printf("\t\tReact Pow + (Q1+Q2): %1d\n", msg->msg18.react_pow_pos);
+    printf("\t\tReact Pow - (Q3+Q4): %1d\n", msg->msg18.react_pow_neg);
+    printf("\t\tCurr L1: %1d\n", msg->msg18.curr_L1);
+    printf("\t\tCurr L2: %1d\n", msg->msg18.curr_L2);
+    printf("\t\tCurr L3: %1d\n", msg->msg18.curr_L3);
+    printf("\t\tVolt L1: %1d\n", msg->msg18.volt_L1);
+    printf("\t\tVolt L2: %1d\n", msg->msg18.volt_L2);
+    printf("\t\tVolt L3: %1d\n", msg->msg18.volt_L3);
+    printf("\t\tDate Time: %s\n", msg->msg18.date_time);
+    printf("\t\tAct Energy +: %1d\n", msg->msg18.act_energy_pa);
+    printf("\t\tAct Energy -: %1d\n", msg->msg18.act_energy_ma);
+    printf("\t\tReact Energy +: %1d\n", msg->msg18.act_energy_pr);
+    printf("\t\tReact Energy -: %1d\n", msg->msg18.act_energy_mr);
+    break;
+  }
+
+  return 0;
+}
+
+/**********************************************************
+ * FUNCTION: readMessage()
+ *********************************************************/
+int readMessage(int serial_port,
+		int cport_num,
+		unsigned char*buf,
+		FILE *f)
+{
+  int n;
+  int length;
+  
+  while(1) { /* find start of header */
+    if (serial_port) {
+      n = RS232_PollComport(cport_num, buf, 1);
+    }
+    else {
+      n = fread(buf, 1, 1, f);
+      if (n==0) return 0;
+    }
+    if (n==1) {
+      if (buf[0] == 0x7e) {
+	if (serial_port) {
+	  n = RS232_PollComport(cport_num, buf+1, 1);
+	}
+	else {
+	  n = fread(buf+1, 1, 1, f);
+	  if (n==0) return 0;
+	}
+	if (n==1) {
+	  if (buf[1] == 0xa0) {
+	    /*	    printf("### 0x7e 0xa0\n"); */
+	    if (serial_port) {
+	      n = RS232_PollComport(cport_num, buf+2, 1);
+	      if (n==0) return 0;
+	    }
+	    else {
+	      n = fread(buf+2, 1, 1, f);
+	      if (n==0) return 0;
+	    }
+	    if (n==1) {
+	      length = buf[2];
+	      break;
+	    }
+	  }
+	}
+      }
+    }
+    else { /* no bytes */
+#ifdef _WIN32
+      Sleep(100);
+#else
+      usleep(500000);  /* sleep for 500 milliSeconds */
+#endif
+    }
+  }
+
+  /* read rest of message */
+  int bytes_read = 3;
+  int frame_delimiters = 2;
+  int bytes_left = length + frame_delimiters - bytes_read;
+  
+  while (bytes_left > 0) {
+    if (serial_port) {
+      n = RS232_PollComport(cport_num, buf+bytes_read, bytes_left);
+    }
+    else {
+      n = fread(buf+bytes_read, 1, bytes_left, f);
+      if (n==0) return 0;
+    }
+    if (n > 0) {
+      bytes_read += n;
+      bytes_left -= n;
+    }
+  }
+  
+  return(bytes_read);
+}
+
+/************************************************************************
+ * FUNCTION: main()
+ ***********************************************************************/
+int main(int argc,
+	char *argv[])
+{  
+  int serial_port=1;
+
+  FILE *lf = NULL;
+
+  if (argc >= 2) { /* playback from file? */
+    if ((lf = fopen(argv[1], "r")) == NULL) {
+      printf("usage: %s: <filename>\n", argv[-2]);
+      return -1;
+    }
+    serial_port=0;
+  }
+
+  char fname[100];
+
+  FILE *rf = NULL;
+
+  if (serial_port) { /* read from rs232 and log to file? */
+    sprintf(fname, "han-data-%1ld.dat", clock()); 
+    if ((rf=fopen(fname, "w+"))==NULL) {
+      printf("could not open han log file\n");
+      return 1;
+    }
+  }
+
+  char mode[]={'8','N','1',0};
+  int cport_num=16;      /* 16 = /dev/ttyUSB0 (/dev/ttyS0 = COM1 on Windows) */
+  int bdrate=2400;       /* 2400 baud */
+
+  if (serial_port) {
+    if (RS232_OpenComport(cport_num, bdrate, mode)) {
+      printf("Can not open comport %1d\n", cport_num);
+      return -1;
+    }
+  }
+
+  int buf_len;
+  unsigned char buf[4096];
+  
+  while ((buf_len = readMessage(serial_port, cport_num, buf, lf)) > 0) {
+    if (verifyMessage(buf, buf_len)) {
+      printf("verify failed\n");
+      continue;
+    }
+    if (decodeMessage(buf, buf_len, &msg)) {
+      printf("decode failed\n");
+      printMessage(buf, buf_len, &msg, rf);
+      continue;
+    }
+    printMessage(buf, buf_len, &msg, rf);
+  }
+
+  return 0;
+}
+
+/* end of file */

@@ -1,0 +1,1 @@
+find . -size 0c -exec /bin/rm -f {} \;

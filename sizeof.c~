@@ -1,0 +1,22 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+int main()
+{
+  typedef struct {
+    long a;
+    long b;
+    long c[10];
+  } X;
+  X *x;
+
+  x = (X *) malloc(sizeof(X));
+
+  x->a = 1;
+  x->b = 2;
+  
+  printf("%1ld %1ld %1ld\n", sizeof(X), sizeof(x), sizeof(*x));
+
+  return 0;
+}
+  
